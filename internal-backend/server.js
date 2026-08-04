@@ -7,6 +7,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Live Render BSE Mock Service URL
+const BSE_SERVICE_URL = 'https://bse-mock-service.onrender.com';
+
 // MySQL Pool Configuration for Aiven MySQL Database
 const db = mysql.createPool({
   host: 'mysql-86309e5-arham-assesment.j.aivencloud.com',
@@ -80,8 +83,6 @@ async function initDatabase() {
 // Call table initialization
 initDatabase();
 
-// ... rest of your API routes (app.get, app.post, etc.) ...
-
 // Server-Sent Events (SSE) Client Connections for Live UI Updates
 let sseClients = [];
 
@@ -100,12 +101,12 @@ function notifyClients(data) {
   sseClients.forEach(client => client.write(`data: ${JSON.stringify(data)}\n\n`));
 }
 
-// Resilient Sync Function with Retries
+// Resilient Sync Function with Retries (Pointing to Live BSE Render Service)
 async function syncBseDataWithRetry(endpoint, maxRetries = 5) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`[Sync] Fetching ${endpoint} (Attempt ${attempt})...`);
-      const response = await axios.get(`http://localhost:5000/bse/${endpoint}`, { timeout: 35000 });
+      const response = await axios.get(`${BSE_SERVICE_URL}/bse/${endpoint}`, { timeout: 35000 });
       return response.data;
     } catch (err) {
       console.warn(`[Sync Failed] ${endpoint} attempt ${attempt} failed: ${err.message}`);
@@ -138,13 +139,13 @@ async function runBackgroundSync() {
   }
 }
 
-// Sync trigger endpoint + Background Schedule every 30 seconds
+// Sync trigger endpoint
 app.post('/api/trigger-sync', (req, res) => {
   runBackgroundSync(); // non-blocking execution
   res.json({ message: 'Sync process started in background.' });
 });
 
-// REST Endpoints serving cached data instantly (<1s requirement)
+// REST Endpoints serving cached data
 app.get('/api/clients', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM clients');
@@ -165,7 +166,6 @@ app.get('/api/trades', async (req, res) => {
 
 app.get('/api/incentives', async (req, res) => {
   try {
-    // Simple calculation logic: 1% brokerage incentive on mapped trades
     const [rows] = await db.query(`
       SELECT e.id as employee_id, e.name as employee_name, COALESCE(SUM(t.amount * 0.01), 0) as total_incentive
       FROM employees e
@@ -179,4 +179,6 @@ app.get('/api/incentives', async (req, res) => {
   }
 });
 
-app.listen(4000, () => console.log('Internal Backend Server running on http://localhost:4000'));
+// Use dynamic environment port for Render deployment
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => console.log(`Internal Backend Server running on port ${PORT}`));
