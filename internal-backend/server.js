@@ -21,6 +21,67 @@ const db = mysql.createPool({
   connectionLimit: 10
 });
 
+async function initDatabase() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS trades (
+        id VARCHAR(50) PRIMARY KEY,
+        client_id VARCHAR(50),
+        amount DECIMAL(12, 2),
+        trade_date DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS clients (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(100),
+        email VARCHAR(100)
+      );
+    `);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS employees (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(100),
+        role VARCHAR(50)
+      );
+    `);
+
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS employee_client_map (
+        employee_id VARCHAR(50),
+        client_id VARCHAR(50),
+        PRIMARY KEY (employee_id, client_id)
+      );
+    `);
+
+    await db.query(`
+      INSERT IGNORE INTO employees (id, name, role) VALUES 
+      ('emp_1', 'Alice (RM)', 'rm'),
+      ('emp_2', 'Bob (RM)', 'rm'),
+      ('mgr_1', 'Charlie (Manager)', 'manager');
+    `);
+
+    await db.query(`
+      INSERT IGNORE INTO employee_client_map (employee_id, client_id) VALUES 
+      ('emp_1', 'cli_101'),
+      ('emp_1', 'cli_102'),
+      ('emp_2', 'cli_103');
+    `);
+
+    console.log('Database tables and seed data initialized successfully!');
+  } catch (err) {
+    console.error('Error initializing database:', err);
+  }
+}
+
+// Call table initialization
+initDatabase();
+
+// ... rest of your API routes (app.get, app.post, etc.) ...
+
 // Server-Sent Events (SSE) Client Connections for Live UI Updates
 let sseClients = [];
 
