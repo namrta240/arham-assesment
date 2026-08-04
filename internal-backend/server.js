@@ -101,7 +101,7 @@ function notifyClients(data) {
   sseClients.forEach(client => client.write(`data: ${JSON.stringify(data)}\n\n`));
 }
 
-// Resilient Sync Function with Retries (Pointing to Live BSE Render Service)
+// Resilient Sync Function with 5-Second Delay to Prevent Rate Limiting (429)
 async function syncBseDataWithRetry(endpoint, maxRetries = 5) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -111,8 +111,9 @@ async function syncBseDataWithRetry(endpoint, maxRetries = 5) {
     } catch (err) {
       console.warn(`[Sync Failed] ${endpoint} attempt ${attempt} failed: ${err.message}`);
       if (attempt === maxRetries) throw err;
-      // Exponential backoff delay
-      await new Promise(res => setTimeout(res, 1000 * attempt));
+      
+      // Increased delay to 5 seconds to prevent rate-limiting (429) and allow spin-up time
+      await new Promise(res => setTimeout(res, 5000));
     }
   }
 }
