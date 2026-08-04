@@ -7,12 +7,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MySQL Pool Configuration (Adjust credentials as needed)
+// MySQL Pool Configuration for Aiven MySQL Database
 const db = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: 'root', // Update this!
-  database: 'arham_db',
+  host: 'mysql-86309e5-arham-assesment.j.aivencloud.com',
+  port: 16832,
+  user: 'avnadmin',
+  password: 'AVNS_WVTB54M8iLmwdsh6t4U',
+  database: 'defaultdb',
+  ssl: {
+    rejectUnauthorized: false
+  },
   waitForConnections: true,
   connectionLimit: 10
 });
@@ -66,7 +70,7 @@ async function runBackgroundSync() {
         [t.id, t.client_id, t.amount, t.trade_date, t.amount]);
     }
 
-    console.log('[Sync Success] Data synced to MySQL!');
+    console.log('[Sync Success] Data synced to Aiven MySQL!');
     notifyClients({ type: 'DATA_UPDATED', timestamp: new Date() });
   } catch (err) {
     console.error('[Sync Error] Failed all retries during sync cycle.');
@@ -81,25 +85,37 @@ app.post('/api/trigger-sync', (req, res) => {
 
 // REST Endpoints serving cached data instantly (<1s requirement)
 app.get('/api/clients', async (req, res) => {
-  const [rows] = await db.query('SELECT * FROM clients');
-  res.json(rows);
+  try {
+    const [rows] = await db.query('SELECT * FROM clients');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/trades', async (req, res) => {
-  const [rows] = await db.query('SELECT * FROM trades');
-  res.json(rows);
+  try {
+    const [rows] = await db.query('SELECT * FROM trades');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/incentives', async (req, res) => {
-  // Simple calculation logic: 1% brokerage incentive on mapped trades
-  const [rows] = await db.query(`
-    SELECT e.id as employee_id, e.name as employee_name, COALESCE(SUM(t.amount * 0.01), 0) as total_incentive
-    FROM employees e
-    LEFT JOIN employee_client_map ecm ON e.id = ecm.employee_id
-    LEFT JOIN trades t ON ecm.client_id = t.client_id
-    GROUP BY e.id, e.name
-  `);
-  res.json(rows);
+  try {
+    // Simple calculation logic: 1% brokerage incentive on mapped trades
+    const [rows] = await db.query(`
+      SELECT e.id as employee_id, e.name as employee_name, COALESCE(SUM(t.amount * 0.01), 0) as total_incentive
+      FROM employees e
+      LEFT JOIN employee_client_map ecm ON e.id = ecm.employee_id
+      LEFT JOIN trades t ON ecm.client_id = t.client_id
+      GROUP BY e.id, e.name
+    `);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(4000, () => console.log('Internal Backend Server running on http://localhost:4000'));
